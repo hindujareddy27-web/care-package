@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>a little parcel</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root{
+    --kraft:#e9dcc3; --kraft-dark:#d8c69f; --ink:#3a3226;
+    --twine:#b98a4f; --stamp:#b5533c; --paper:#fbf6ea;
+    --shadow: rgba(58,50,38,0.25);
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; min-height:100vh; background:var(--kraft);
+    background-image:repeating-linear-gradient(45deg, rgba(0,0,0,0.015) 0, rgba(0,0,0,0.015) 1px, transparent 1px, transparent 12px), var(--kraft);
+    font-family:'JetBrains Mono', monospace; color:var(--ink);
+    display:flex; align-items:flex-start; justify-content:center;
+    padding:32px 16px 80px;
+  }
+  .script{font-family:'Caveat', cursive;}
+  .wrap{width:100%; max-width:460px;}
+  .label{
+    background:var(--paper); border:2px solid var(--ink); border-radius:2px;
+    box-shadow:6px 6px 0 var(--shadow); padding:20px; position:relative; margin-bottom:24px;
+  }
+  .label::before{
+    content:''; position:absolute; top:-14px; left:24px; right:24px; height:14px;
+    background:radial-gradient(circle at 6px 14px, transparent 6px, var(--twine) 6.5px) top left / 16px 14px repeat-x;
+    opacity:0.85;
+  }
+  .stamp{
+    position:absolute; top:14px; right:14px; width:52px; height:64px;
+    border:2px dashed var(--stamp); color:var(--stamp);
+    display:flex; align-items:center; justify-content:center;
+    font-family:'Caveat', cursive; font-size:12px; font-weight:700;
+    transform:rotate(6deg); text-align:center; line-height:1.1; padding:4px;
+  }
+  .eyebrow{font-size:10px; letter-spacing:0.14em; text-transform:uppercase; opacity:0.6; margin-bottom:4px;}
+  .field{border-bottom:1px solid var(--ink); padding:6px 2px 8px; margin-bottom:10px; font-size:15px;}
+  .field input{width:100%; border:none; background:transparent; font-family:'Caveat', cursive; font-size:22px; color:var(--ink); outline:none;}
+  .brand{text-align:center; margin-top:18px;}
+  .brand .name{font-family:'Caveat', cursive; font-size:26px; font-weight:700;}
+  .brand .est{font-size:9px; letter-spacing:0.12em; opacity:0.55; text-transform:uppercase;}
+  .section-title{font-size:11px; letter-spacing:0.14em; text-transform:uppercase; opacity:0.65; margin:28px 0 10px 4px;}
+  .card{background:var(--paper); border:1.5px solid var(--ink); border-radius:2px; padding:14px; margin-bottom:20px; box-shadow:3px 3px 0 var(--shadow);}
+  .items{display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:20px;}
+  .item{
+    background:var(--paper); border:1.5px solid var(--ink); border-radius:2px; padding:12px 10px;
+    cursor:pointer; display:flex; align-items:center; gap:8px; font-size:12.5px; user-select:none;
+    transition:transform .12s ease, box-shadow .12s ease; box-shadow:3px 3px 0 var(--shadow);
+  }
+  .item:hover{transform:translate(-1px,-1px); box-shadow:4px 4px 0 var(--shadow);}
+  .item.picked{background:var(--twine); color:var(--paper); border-color:var(--ink);}
+  .item .ic{font-size:18px;}
+  textarea{width:100%; min-height:70px; border:none; outline:none; resize:vertical; font-family:'Caveat', cursive; font-size:19px; background:transparent; color:var(--ink);}
+  input[type=text], input[type=url]{
+    width:100%; border:none; border-bottom:1px solid var(--ink); background:transparent;
+    font-family:'JetBrains Mono',monospace; font-size:12.5px; padding:8px 2px; outline:none; color:var(--ink);
+  }
+  button.primary{
+    width:100%; padding:14px; background:var(--ink); color:var(--paper); border:none; border-radius:2px;
+    font-family:'JetBrains Mono', monospace; font-weight:700; font-size:13px; letter-spacing:0.06em;
+    text-transform:uppercase; cursor:pointer; box-shadow:4px 4px 0 var(--shadow);
+  }
+  button.primary:disabled{opacity:0.4; cursor:not-allowed;}
+  button.primary:active{transform:translate(2px,2px); box-shadow:2px 2px 0 var(--shadow);}
+  button.secondary{
+    background:transparent; border:1px solid var(--ink); padding:8px 12px; border-radius:2px;
+    font-family:'JetBrains Mono',monospace; font-size:10.5px; letter-spacing:0.06em; text-transform:uppercase; cursor:pointer;
+  }
+  .row{display:flex; gap:8px; flex-wrap:wrap; align-items:center;}
+  .linkout{margin-top:14px; background:var(--paper); border:1.5px dashed var(--ink); border-radius:2px; padding:12px; font-size:11.5px; word-break:break-all; display:none;}
+  .linkout.show{display:block;}
+  .hint{font-size:10.5px; opacity:0.55; margin-top:6px; line-height:1.4;}
+  canvas#drawPad{width:100%; aspect-ratio:1/1; height:auto; background:#fff; border:1px solid var(--ink); border-radius:2px; touch-action:none; cursor:crosshair;}
+  .sticker-grid{display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; margin-bottom:20px;}
+  .sticker{
+    aspect-ratio:1/1; background:var(--paper); border:1.5px solid var(--ink); border-radius:2px;
+    cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:34px;
+    box-shadow:3px 3px 0 var(--shadow); transition:transform .12s ease, box-shadow .12s ease;
+  }
+  .sticker:hover{transform:translate(-1px,-1px); box-shadow:4px 4px 0 var(--shadow);}
+  .sticker.picked{background:var(--twine); border-color:var(--ink); outline:2px solid var(--ink); outline-offset:-4px;}
+  .sticker img{width:70%; height:70%; object-fit:contain;}
+  .swatch{width:22px; height:22px; border-radius:50%; border:2px solid var(--ink); cursor:pointer;}
+  .swatch.active{outline:2px solid var(--twine); outline-offset:2px;}
+  .thumbs{display:flex; gap:8px; flex-wrap:wrap; margin-top:10px;}
+  .thumb{width:64px; height:64px; object-fit:cover; border:1.5px solid var(--ink); border-radius:2px;}
+  .thumb-wrap{position:relative;}
+  .thumb-x{position:absolute; top:-6px; right:-6px; background:var(--stamp); color:#fff; width:18px; height:18px; border-radius:50%; font-size:11px; display:flex; align-items:center; justify-content:center; cursor:pointer;}
+  .rec-btn{width:56px; height:56px; border-radius:50%; background:var(--stamp); border:2px solid var(--ink); cursor:pointer; color:#fff; font-size:18px;}
+  .rec-btn.recording{animation:pulse 1s infinite;}
+  @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(181,83,60,0.5);}70%{box-shadow:0 0 0 12px rgba(181,83,60,0);}100%{box-shadow:0 0 0 0 rgba(181,83,60,0);}}
+  .footer-note{text-align:center; font-size:10px; opacity:0.5; margin-top:26px;}
+  .hidden{display:none !important;}
+
+  /* recipient */
+  .parcel-screen{display:flex; flex-direction:column; align-items:center; gap:18px; padding-top:20px;}
+  .box{width:230px; height:170px; position:relative; cursor:pointer; perspective:900px;}
+  .box .front{position:absolute; inset:0; top:40px; background:var(--kraft-dark); border:2px solid var(--ink); border-radius:2px; box-shadow:6px 6px 0 var(--shadow);}
+  .box .front::after{content:''; position:absolute; inset:0; border:1px dashed rgba(58,50,38,0.4); margin:8px;}
+  .box .lid{position:absolute; top:0; left:0; right:0; height:60px; background:var(--twine); border:2px solid var(--ink); border-radius:2px; transform-origin:top center; transition:transform .5s ease; box-shadow:6px 3px 0 var(--shadow);}
+  .box.open .lid{transform:rotateX(115deg) translateY(-4px);}
+  .tap-label{font-family:'Caveat', cursive; font-size:20px; text-align:center;}
+  .reveal{width:100%; max-width:420px; display:none; flex-direction:column; gap:14px;}
+  .reveal.show{display:flex;}
+  .reveal .from-line{font-family:'Caveat', cursive; font-size:24px; text-align:center;}
+  .note{background:var(--paper); border:1.5px solid var(--ink); border-radius:2px; padding:16px; font-family:'Caveat', cursive; font-size:20px; box-shadow:3px 3px 0 var(--shadow); white-space:pre-wrap;}
+  .collage{display:flex; flex-wrap:wrap; gap:14px; justify-content:center; padding:10px 0;}
+  .polaroid{background:#fff; padding:8px 8px 18px; border:1px solid var(--ink); box-shadow:3px 3px 0 var(--shadow);}
+  .polaroid img{width:120px; height:120px; object-fit:cover; display:block;}
+  .polaroid:nth-child(odd){transform:rotate(-3deg);}
+  .polaroid:nth-child(even){transform:rotate(2.5deg);}
+  .drawing-frame{background:#fff; border:1.5px solid var(--ink); border-radius:2px; padding:6px; box-shadow:3px 3px 0 var(--shadow);}
+  .drawing-frame img{width:100%; display:block; border-radius:1px;}
+  audio{width:100%;}
+  .status{font-size:11px; opacity:0.6; text-align:center; margin-top:10px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- ============ SENDER VIEW ============ -->
+  <div id="senderView">
+    <div class="label">
+      <div class="stamp">care<br>parcel</div>
+      <div class="eyebrow">to</div>
+      <div class="field"><input id="toName" placeholder="their name" maxlength="30"></div>
+      <div class="eyebrow">from</div>
+      <div class="field"><input id="fromName" placeholder="your name" maxlength="30"></div>
+      <div class="brand"><div class="name">a little parcel</div><div class="est">est. for sending a little care</div></div>
+    </div>
+
+    <div class="section-title">things to tuck inside</div>
+    <div class="items" id="itemGrid"></div>
+
+    <div class="section-title">write a letter</div>
+    <div class="card"><textarea id="letterText" placeholder="dear..." maxlength="2000" style="min-height:110px;"></textarea></div>
+
+    <div class="section-title">a song for them</div>
+    <div class="card">
+      <input type="url" id="spotifyUrl" placeholder="paste a Spotify song/playlist link">
+      <div class="hint">open Spotify → share → copy link, then paste it here.</div>
+    </div>
+
+    <div class="section-title">a little note</div>
+    <div class="card"><textarea id="noteAfterSong" placeholder="say something..." maxlength="500"></textarea></div>
+
+    <div class="section-title">pick some stickers</div>
+    <div class="sticker-grid" id="stickerGrid"></div>
+
+    <div class="section-title">doodle something</div>
+    <div class="card">
+      <canvas id="drawPad" width="500" height="500"></canvas>
+      <div class="row" style="margin-top:10px;">
+        <span class="swatch active" style="background:#3a3226" data-color="#3a3226"></span>
+        <span class="swatch" style="background:#b5533c" data-color="#b5533c"></span>
+        <span class="swatch" style="background:#b98a4f" data-color="#b98a4f"></span>
+        <span class="swatch" style="background:#4a7c59" data-color="#4a7c59"></span>
+        <span class="swatch" style="background:#3a6ea5" data-color="#3a6ea5"></span>
+        <button class="secondary" id="clearDraw" style="margin-left:auto;">clear</button>
+      </div>
+    </div>
+
+    <div class="section-title">tuck in some photos</div>
+    <div class="card">
+      <input type="file" id="photoInput" accept="image/*" multiple>
+      <div class="thumbs" id="photoThumbs"></div>
+    </div>
+
+    <div class="section-title">a voice message</div>
+    <div class="card">
+      <div class="row">
+        <button class="rec-btn" id="recBtn">●</button>
+        <span id="recStatus" class="hint">tap to record</span>
+      </div>
+      <audio id="recPreview" controls style="margin-top:10px; display:none;"></audio>
+    </div>
+
+    <div class="section-title">one more note</div>
+    <div class="card"><textarea id="noteAfterVoice" placeholder="anything else..." maxlength="500"></textarea></div>
+
+    <div class="section-title">a little video</div>
+    <div class="card">
+      <input type="file" id="videoInput" accept="video/*">
+      <video id="videoPreview" controls style="width:100%; margin-top:10px; display:none; border:1.5px solid var(--ink); border-radius:2px;"></video>
+      <div class="hint">keep it short — under ~50MB uploads fastest.</div>
+    </div>
+
+    <button class="primary" id="genBtn">wrap it up →</button>
+    <div class="status" id="genStatus"></div>
+    <div class="linkout" id="linkOut">
+      <div id="linkText"></div>
+      <button class="secondary" id="copyBtn" style="margin-top:8px;">copy link</button>
+    </div>
+    <div class="footer-note">a little parcel · made with care, no checkout required</div>
+  </div>
+
+  <!-- ============ RECIPIENT VIEW ============ -->
+  <div id="recipientView" class="hidden">
+    <div class="parcel-screen">
+      <div id="rToLine" class="tap-label"></div>
+      <div class="box" id="box"><div class="lid"></div><div class="front"></div></div>
+      <div class="tap-label" id="tapHint">tap the box to open</div>
+      <div class="reveal" id="reveal">
+        <div class="from-line" id="rFromLine"></div>
+        <div class="note" id="rNote"></div>
+        <div id="rSpotifyWrap"></div>
+        <div class="note" id="rNoteAfterSong" style="display:none;"></div>
+        <div class="items" id="rItems"></div>
+        <div class="sticker-grid" id="rStickers"></div>
+        <div id="rDrawWrap"></div>
+        <div class="collage" id="rPhotos"></div>
+        <div id="rAudioWrap"></div>
+        <div class="note" id="rNoteAfterVoice" style="display:none;"></div>
+        <div id="rVideoWrap"></div>
+        <div class="footer-note">sent with a little parcel</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+/* ===== FILL THESE IN AFTER YOU CREATE YOUR SUPABASE PROJECT ===== */
+const SUPABASE_URL = "https://bgtbkoukgyhyyhuwcpmt.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJndGJrb3VrZ3loeXlodXdjcG10Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY3NTc5ODgsImV4cCI6MjEwMjMzMzk4OH0.vQ9KVYNAM4_Uut7AG3B2CkCJZUa65hQNMML_9m_dzpI";
+/* ================================================================= */
+
+const sb = (SUPABASE_URL.startsWith('http')) ? supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
+const BUCKET = "parcel-media";
+
+const ITEMS = [
+  {id:'cookie', ic:'🍪', label:'a cookie'}, {id:'tea', ic:'🍵', label:'good tea'},
+  {id:'candle', ic:'🕯️', label:'a candle'}, {id:'flower', ic:'🌸', label:'a flower'},
+  {id:'candy', ic:'🍬', label:'candy'}, {id:'socks', ic:'🧦', label:'cozy socks'},
+  {id:'hug', ic:'🫂', label:'a big hug'}, {id:'book', ic:'📖', label:'a bookmark'},
+];
+// sticker images live in your GitHub repo's /assets folder alongside this file
+const STICKERS = [
+  {id:'s_bow', ic:'assets/bow.jpg'},
+  {id:'s_cat', ic:'assets/cat.jpg'},
+  {id:'s_heartmsg', ic:'assets/heartmsg.jpg'},
+  {id:'s_loveu', ic:'assets/loveu.jpg'},
+  {id:'s_star', ic:'assets/star.jpg'},
+  {id:'s_tulips', ic:'assets/tulips.jpg'},
+];
+
+const params = new URLSearchParams(location.hash.slice(1));
+const pid = params.get('id');
+
+function isImagePath(s){
+  return s.startsWith('http') || s.startsWith('assets/') || /\.(png|jpg|jpeg|webp|gif|svg)$/i.test(s);
+}
+
+function renderPicker(gridEl, list, picked){
+  list.forEach(it=>{
+    const el = document.createElement('div');
+    el.className='item';
+    const iconHtml = isImagePath(it.ic) ? `<img src="${it.ic}" style="width:22px;height:22px;">` : `<span class="ic">${it.ic}</span>`;
+    el.innerHTML = `${iconHtml}<span>${it.label}</span>`;
+    el.addEventListener('click', ()=>{
+      if(picked.has(it.id)){ picked.delete(it.id); el.classList.remove('picked'); }
+      else{ picked.add(it.id); el.classList.add('picked'); }
+    });
+    gridEl.appendChild(el);
+  });
+}
+function renderStickerPicker(gridEl, list, picked){
+  list.forEach(it=>{
+    const el = document.createElement('div');
+    el.className='sticker';
+    el.innerHTML = isImagePath(it.ic) ? `<img src="${it.ic}">` : it.ic;
+    el.addEventListener('click', ()=>{
+      if(picked.has(it.id)){ picked.delete(it.id); el.classList.remove('picked'); }
+      else{ picked.add(it.id); el.classList.add('picked'); }
+    });
+    gridEl.appendChild(el);
+  });
+}
+function renderStickerDisplay(gridEl, list, ids){
+  ids.forEach(id=>{
+    const it = list.find(i=>i.id===id); if(!it) return;
+    const el = document.createElement('div'); el.className='sticker picked';
+    el.innerHTML = isImagePath(it.ic) ? `<img src="${it.ic}">` : it.ic;
+    gridEl.appendChild(el);
+  });
+}
+
+if(pid){
+  /* ================= RECIPIENT MODE ================= */
+  document.getElementById('senderView').classList.add('hidden');
+  document.getElementById('recipientView').classList.remove('hidden');
+
+  (async ()=>{
+    if(!sb){ document.getElementById('rNote').textContent = "this page isn't connected yet — the sender needs to add their Supabase keys."; return; }
+    const { data, error } = await sb.from('parcels').select('*').eq('id', pid).single();
+    if(error || !data){ document.getElementById('rNote').textContent = "this parcel link looks broken — ask them to resend it."; return; }
+
+    document.getElementById('rToLine').textContent = data.to_name ? `for ${data.to_name}` : 'a parcel for you';
+    document.getElementById('rFromLine').textContent = data.from_name ? `from ${data.from_name}` : '';
+    document.getElementById('rNote').textContent = data.message || '';
+
+    if(data.spotify_url){
+      const m = data.spotify_url.match(/open\.spotify\.com\/(track|playlist|album)\/([a-zA-Z0-9]+)/);
+      if(m){
+        document.getElementById('rSpotifyWrap').innerHTML =
+          `<iframe style="border-radius:6px" src="https://open.spotify.com/embed/${m[1]}/${m[2]}" width="100%" height="152" frameborder="0" allow="encrypted-media"></iframe>`;
+      }
+    }
+
+    if(data.note_after_song){
+      const el = document.getElementById('rNoteAfterSong');
+      el.textContent = data.note_after_song; el.style.display='block';
+    }
+    if(data.note_after_voice){
+      const el = document.getElementById('rNoteAfterVoice');
+      el.textContent = data.note_after_voice; el.style.display='block';
+    }
+
+    const rItems = document.getElementById('rItems');
+    (data.items||[]).forEach(id=>{
+      const it = ITEMS.find(i=>i.id===id); if(!it) return;
+      const iconHtml = isImagePath(it.ic) ? `<img src="${it.ic}" style="width:22px;height:22px;">` : `<span class="ic">${it.ic}</span>`;
+      const el = document.createElement('div'); el.className='item picked';
+      el.innerHTML = `${iconHtml}<span>${it.label}</span>`;
+      rItems.appendChild(el);
+    });
+    renderStickerDisplay(document.getElementById('rStickers'), STICKERS, data.stickers||[]);
+
+    if(data.drawing_url){
+      document.getElementById('rDrawWrap').innerHTML = `<div class="drawing-frame"><img src="${data.drawing_url}"></div>`;
+    }
+    (data.photo_urls||[]).forEach(url=>{
+      const p = document.createElement('div'); p.className='polaroid';
+      p.innerHTML = `<img src="${url}">`;
+      document.getElementById('rPhotos').appendChild(p);
+    });
+    if(data.voice_url){
+      document.getElementById('rAudioWrap').innerHTML = `<audio controls src="${data.voice_url}"></audio>`;
+    }
+    if(data.video_url){
+      document.getElementById('rVideoWrap').innerHTML = `<video controls style="width:100%; border:1.5px solid var(--ink); border-radius:2px;" src="${data.video_url}"></video>`;
+    }
+
+    const box = document.getElementById('box');
+    box.addEventListener('click', ()=>{
+      box.classList.add('open');
+      document.getElementById('tapHint').style.display='none';
+      setTimeout(()=>document.getElementById('reveal').classList.add('show'), 350);
+    });
+  })();
+
+} else {
+  /* ================= SENDER MODE ================= */
+  const pickedItems = new Set();
+  const pickedStickers = new Set();
+  renderPicker(document.getElementById('itemGrid'), ITEMS, pickedItems);
+  renderStickerPicker(document.getElementById('stickerGrid'), STICKERS, pickedStickers);
+
+  // drawing pad
+  const canvas = document.getElementById('drawPad');
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#fff'; ctx.fillRect(0,0,canvas.width,canvas.height);
+  ctx.lineWidth = 4; ctx.lineCap='round'; ctx.strokeStyle='#3a3226';
+  let drawing=false, lastX=0, lastY=0;
+  function pos(e){
+    const r = canvas.getBoundingClientRect();
+    const cx = (e.touches? e.touches[0].clientX : e.clientX) - r.left;
+    const cy = (e.touches? e.touches[0].clientY : e.clientY) - r.top;
+    return [cx*(canvas.width/r.width), cy*(canvas.height/r.height)];
+  }
+  function start(e){ drawing=true; [lastX,lastY]=pos(e); }
+  function move(e){
+    if(!drawing) return; e.preventDefault();
+    const [x,y]=pos(e);
+    ctx.beginPath(); ctx.moveTo(lastX,lastY); ctx.lineTo(x,y); ctx.stroke();
+    [lastX,lastY]=[x,y];
+  }
+  function end(){ drawing=false; }
+  canvas.addEventListener('mousedown', start); canvas.addEventListener('mousemove', move); window.addEventListener('mouseup', end);
+  canvas.addEventListener('touchstart', start); canvas.addEventListener('touchmove', move); canvas.addEventListener('touchend', end);
+  document.querySelectorAll('.swatch').forEach(s=>{
+    s.addEventListener('click', ()=>{
+      document.querySelectorAll('.swatch').forEach(x=>x.classList.remove('active'));
+      s.classList.add('active'); ctx.strokeStyle = s.dataset.color;
+    });
+  });
+  document.getElementById('clearDraw').addEventListener('click', ()=>{ ctx.fillStyle='#fff'; ctx.fillRect(0,0,canvas.width,canvas.height); });
+
+  // photos
+  let photoFiles = [];
+  document.getElementById('photoInput').addEventListener('change', (e)=>{
+    photoFiles = [...photoFiles, ...Array.from(e.target.files)];
+    renderThumbs();
+  });
+  function renderThumbs(){
+    const wrap = document.getElementById('photoThumbs'); wrap.innerHTML='';
+    photoFiles.forEach((f,i)=>{
+      const url = URL.createObjectURL(f);
+      const d = document.createElement('div'); d.className='thumb-wrap';
+      d.innerHTML = `<img class="thumb" src="${url}"><div class="thumb-x">×</div>`;
+      d.querySelector('.thumb-x').addEventListener('click', ()=>{ photoFiles.splice(i,1); renderThumbs(); });
+      wrap.appendChild(d);
+    });
+  }
+
+  // video
+  let videoFile = null;
+  document.getElementById('videoInput').addEventListener('change', (e)=>{
+    videoFile = e.target.files[0] || null;
+    const preview = document.getElementById('videoPreview');
+    if(videoFile){ preview.src = URL.createObjectURL(videoFile); preview.style.display='block'; }
+    else{ preview.style.display='none'; }
+  });
+
+  // voice recording
+  let mediaRecorder, audioChunks=[], audioBlob=null, recording=false;
+  document.getElementById('recBtn').addEventListener('click', async ()=>{
+    const btn = document.getElementById('recBtn'); const status = document.getElementById('recStatus');
+    if(!recording){
+      const stream = await navigator.mediaDevices.getUserMedia({audio:true});
+      mediaRecorder = new MediaRecorder(stream);
+      audioChunks = [];
+      mediaRecorder.ondataavailable = e=>audioChunks.push(e.data);
+      mediaRecorder.onstop = ()=>{
+        audioBlob = new Blob(audioChunks, {type:'audio/webm'});
+        const preview = document.getElementById('recPreview');
+        preview.src = URL.createObjectURL(audioBlob); preview.style.display='block';
+      };
+      mediaRecorder.start(); recording=true;
+      btn.classList.add('recording'); status.textContent='recording... tap to stop';
+    } else {
+      mediaRecorder.stop(); recording=false;
+      btn.classList.remove('recording'); status.textContent='recorded — tap to re-record';
+    }
+  });
+
+  async function uploadFile(file, prefix){
+    const fname = `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2,8)}`;
+    const { error } = await sb.storage.from(BUCKET).upload(fname, file);
+    if(error) throw error;
+    return sb.storage.from(BUCKET).getPublicUrl(fname).data.publicUrl;
+  }
+
+  document.getElementById('genBtn').addEventListener('click', async ()=>{
+    if(!sb){ alert("Add your Supabase URL and anon key at the top of the file first."); return; }
+    const status = document.getElementById('genStatus');
+    status.textContent = 'wrapping up your parcel...';
+    try{
+      const drawBlob = await new Promise(res=>canvas.toBlob(res, 'image/png'));
+      const drawing_url = await uploadFile(drawBlob, 'drawing');
+
+      const photo_urls = [];
+      for(const f of photoFiles){ photo_urls.push(await uploadFile(f, 'photo')); }
+
+      let voice_url = null;
+      if(audioBlob){ voice_url = await uploadFile(audioBlob, 'voice'); }
+
+      let video_url = null;
+      if(videoFile){ video_url = await uploadFile(videoFile, 'video'); }
+
+      const { data, error } = await sb.from('parcels').insert({
+        to_name: document.getElementById('toName').value.trim(),
+        from_name: document.getElementById('fromName').value.trim(),
+        message: document.getElementById('letterText').value.trim(),
+        spotify_url: document.getElementById('spotifyUrl').value.trim(),
+        note_after_song: document.getElementById('noteAfterSong').value.trim(),
+        note_after_voice: document.getElementById('noteAfterVoice').value.trim(),
+        items: [...pickedItems],
+        stickers: [...pickedStickers],
+        photo_urls, drawing_url, voice_url, video_url
+      }).select().single();
+      if(error) throw error;
+
+      const url = `${location.origin}${location.pathname}#id=${data.id}`;
+      document.getElementById('linkText').textContent = url;
+      document.getElementById('linkOut').classList.add('show');
+      status.textContent = 'done — link ready below.';
+      document.getElementById('copyBtn').onclick = ()=>{
+        navigator.clipboard.writeText(url);
+        document.getElementById('copyBtn').textContent='copied!';
+        setTimeout(()=>document.getElementById('copyBtn').textContent='copy link',1500);
+      };
+    }catch(err){
+      console.error(err);
+      status.textContent = 'something went wrong — check the console, or your Supabase setup.';
+    }
+  });
+}
+</script>
+</body>
+</html>
